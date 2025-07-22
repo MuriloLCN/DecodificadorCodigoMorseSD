@@ -2,6 +2,7 @@
 
 #include <avr/io.h>        
 #include <util/delay.h>    
+#include <math.h>
 // #include <avr/pgmspace.h>  
 
 #define pulso_enable() _delay_us(1); set_bit(CONTR_LCD,E); _delay_us(1); clr_bit(CONTR_LCD,E); _delay_us(45)
@@ -34,20 +35,89 @@ float tempo_nao_pressionado = 0.0;
 char mensagem1[] = "             \0";
 char mensagem2[] = "             \0";
 
-// ISR(borda de descida no pino do botão principal)
-// {
-//     ...
+// Decodificador da árvore binária + 31
+int contador = 31;
+// Número de pressoes da letra atual (0 -> +-16, 1 -> +- 8, 2 -> +- 4, 3 -> +- 2, 4 -> +-1, 5 ou mais n fazem nada)
+int n = 0;
+
+typedef enum {nao_pressionado, curto, longo, erro} tipo_pressao;
+
+tipo_pressao t_pressao = nao_pressionado;
+
+char dicionario_morse[] = {
+  '5', // 00
+  'h', // 01
+  '4', // 02
+  's', // 03
+  '#', // 04
+  'v', // 05
+  '3', // 06
+  'i', // 07
+  '#', // 08
+  'f', // 09
+  '#', // 10
+  'u', // 11
+  '#', // 12
+  '#', // 13
+  '2', // 14
+  'e', // 15
+  '#', // 16
+  'l', // 17
+  '#', // 18
+  'r', // 19
+  '+', // 20
+  '#', // 21
+  '#', // 22
+  'a', // 23
+  '#', // 24
+  'p', // 25
+  '#', // 26
+  'w', // 27
+  '#', // 28
+  'j', // 29
+  '1', // 30
+  '#', // 31
+  '6', // 32
+  'b', // 33
+  '=', // 34
+  'd', // 35
+  '/', // 36
+  'x', // 37
+  '#', // 38
+  'n', // 39
+  '#', // 40
+  'c', // 41
+  '#', // 42
+  'k', // 43
+  '#', // 44
+  'y', // 45
+  '#', // 46
+  't', // 47
+  '7', // 48
+  'z', // 49
+  '#', // 50
+  'g', // 51
+  '#', // 52
+  'q', // 53
+  '#', // 54
+  'm', // 55
+  '8', // 56
+  '#', // 57
+  '#', // 58
+  '8', // 59
+  '9', // 60
+  '#', // 61
+  '0', // 62
+};
 
 void print_mensagem()
 {
-  // Imprime a mensagem no display LCD (Obs: O display que temos é i2c, tem que usar a biblioteca eu acho
+  // Imprime a mensagem no display LCD (Obs: O display que temos é i2c, tem que usar a biblioteca eu acho)
 }
 
 void timer_tick()
 {
-  	cpl_bit(PORTB, LED_VERDE);
-    // Verifica estado do botão em tempo real
-    if (!(PIND & (1 << PD2)))  // botão pressionado (nível baixo)
+    if ((PIND & (1 << PD2)))  // botão pressionado
     {
         tempo_pressionado += INTERVALO_MS;
         tempo_nao_pressionado = 0.0;
@@ -68,7 +138,22 @@ ISR(TIMER1_COMPA_vect)
 // Executa quando o botão é solto
 ISR(INT0_vect)
 {
-    cpl_bit(PORTB, LED_AZUL);
+    if (n >= 5 || t_pressao == erro || t_pressao == nao_pressionado)
+    {
+        // Letras inválidas
+        return;
+    }
+
+    int adicionar_contador = pow(2, 4 - n);
+    
+    if (t_pressao == curto)
+    {
+        adicionar_contador *= -1;
+    }
+
+    contador += adicionar_contador;
+    n++;
+    t_pressao = nao_pressionado;
 }
 
 
@@ -120,7 +205,53 @@ int main()
 
     while(1)
     {
-        
+
+        // Imprimir buffer no display
+
+        if (tempo_nao_pressionado > TEMPO_ENTRE_LETRAS)
+        {
+            if (n == 0)
+            {
+                continue;
+            }
+            char letra_a_adicionar = dicionario_morse[n];
+            // Shiftar o buffer
+            // Colocar letra no buffer
+            n = 0;
+        }
+
+        if (tempo_pressionado == 0)
+        {
+            t_pressao = nao_pressionado;
+            clr_bit(PORTB, LED_AMARELO);
+            clr_bit(PORTB, LED_AZUL);
+            set_bit(PORTB, LED_VERDE);
+            clr_bit(PORTB, LED_VERMELHO);
+        }
+        else if (tempo_pressionado <= INTERVALO_LIMITE_CURTO)
+        {
+            t_pressao = curto; 
+            set_bit(PORTB, LED_AMARELO);
+            clr_bit(PORTB, LED_AZUL);
+            clr_bit(PORTB, LED_VERDE);
+            clr_bit(PORTB, LED_VERMELHO);
+        }
+        else if (tempo_pressionado <= INTERVALO_LIMITE_LONGO)
+        {
+            t_pressao = longo;
+            clr_bit(PORTB, LED_AMARELO);
+            set_bit(PORTB, LED_AZUL);
+            clr_bit(PORTB, LED_VERDE);
+            clr_bit(PORTB, LED_VERMELHO);
+        }
+        else
+        {
+            t_pressao = erro;
+            clr_bit(PORTB, LED_AMARELO);
+            clr_bit(PORTB, LED_AZUL);
+            clr_bit(PORTB, LED_VERDE);
+            set_bit(PORTB, LED_VERMELHO);
+        }
     }
 }
 
