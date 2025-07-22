@@ -205,6 +205,9 @@ int main()
 
     while(1)
     {
+        // Se o botão de espaço tiver pressionado, shiftar o buffer e colocar um espaço (colocar um delay dps pra n dar BO)
+
+        // Se o botão de apagar tiver pressionado, shiftar o buffer no sentido contário (tbm com um delay dps)
 
         // Imprimir buffer no display
 
