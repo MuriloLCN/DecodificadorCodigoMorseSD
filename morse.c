@@ -217,10 +217,12 @@ int main()
             {
                 continue;
             }
-            char letra_a_adicionar = dicionario_morse[n];
+            char letra_a_adicionar = dicionario_morse[contador];
             // Shiftar o buffer
             // Colocar letra no buffer
             n = 0;
+            contador = 31;
+
         }
 
         if (tempo_pressionado == 0)
