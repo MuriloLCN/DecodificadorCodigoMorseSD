@@ -3,7 +3,13 @@
 #include <avr/io.h>        
 #include <util/delay.h>    
 #include <math.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <stdio.h>
+
 // #include <avr/pgmspace.h>  
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
 #define pulso_enable() _delay_us(1); set_bit(CONTR_LCD,E); _delay_us(1); clr_bit(CONTR_LCD,E); _delay_us(45)
 
@@ -28,12 +34,14 @@
 #define LED_AMARELO PB2
 #define LED_VERDE PB3
 
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
 float tempo_pressionado = 0.0;
 float tempo_nao_pressionado = 0.0;
 
 // TODO: Ver a quantidade correta de caracteres que cabem no display
-char mensagem1[] = "             \0";
-char mensagem2[] = "             \0";
+char mensagem1[] = "           \0";
+char mensagem2[] = "           \0";
 
 // Decodificador da árvore binária + 31
 int contador = 31;
@@ -43,6 +51,9 @@ int n = 0;
 typedef enum {nao_pressionado, curto, longo, erro} tipo_pressao;
 
 tipo_pressao t_pressao = nao_pressionado;
+
+// char LCD_BUFFER[17] = "               \0";                  
+char LCD_BUFFER[17] = "               \0";                  
 
 char dicionario_morse[] = {
   '5', // 00
@@ -104,7 +115,7 @@ char dicionario_morse[] = {
   '8', // 56
   '#', // 57
   '#', // 58
-  '8', // 59
+  'o', // 59
   '9', // 60
   '#', // 61
   '0', // 62
@@ -113,6 +124,16 @@ char dicionario_morse[] = {
 void print_mensagem()
 {
   // Imprime a mensagem no display LCD (Obs: O display que temos é i2c, tem que usar a biblioteca eu acho)
+    display.clearDisplay();
+
+    display.setTextSize(1);
+    display.setTextColor(WHITE);
+    display.setCursor(0, 30);
+    // Display static text
+    display.println(LCD_BUFFER);
+    // display.setCursor(0, 30);
+    // display.println(mensagem2);
+    display.display(); 
 }
 
 void timer_tick()
@@ -154,8 +175,26 @@ ISR(INT0_vect)
     contador += adicionar_contador;
     n++;
     t_pressao = nao_pressionado;
+    _delay_ms(20);
 }
 
+void shift_r_buffer()
+{
+	for (int i = 15; i > 0; i--)
+    {
+    	LCD_BUFFER[i] = LCD_BUFFER[i-1];
+    }
+    LCD_BUFFER[0] = ' ';
+}
+
+void shift_l_buffer()
+{
+	for (int i = 0; i < 15; i++)
+    {
+    	LCD_BUFFER[i] = LCD_BUFFER[i+1];
+    }
+    LCD_BUFFER[15] = ' ';
+}
 
 int main()
 {
@@ -193,8 +232,15 @@ int main()
     EICRA |= (1 << ISC01); // Interrupção na borda de descida
     EICRA &= ~(1 << ISC00);
     EIMSK |= (1 << INT0); // Habilita interrupção
-
+  	  
     sei();
+
+    
+    Wire.begin();
+    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+    _delay_ms(100);
+
+    //delay(2000);
     // DDRD = 0xFF;
     // DDRB = 0b00011110; //somente pino de disparo como saída (PB1), captura no PB0 (ICP1)
     // PORTB = 0b11100010;
@@ -202,14 +248,28 @@ int main()
     // TCCR1B = (1<<ICES1)|(1<<CS11); //TC1 com prescaler = 8, captura na borda de subida
     // TIMSK1 = 1<<ICIE1;             //habilita a interrupção por captura
     // sei();                         //habilita a chave de interrupções globais
+  	
+  	bool desenharLCD = false;
 
     while(1)
     {
         // Se o botão de espaço tiver pressionado, shiftar o buffer e colocar um espaço (colocar um delay dps pra n dar BO)
-
+        if ((PIND & (1 << BOTAO_ESPACO)))
+        {
+            shift_l_buffer();
+            // LCD_BUFFER[15] = ' ';
+            desenharLCD = true;
+            _delay_ms(200);
+            // delay(200);
+        }
         // Se o botão de apagar tiver pressionado, shiftar o buffer no sentido contário (tbm com um delay dps)
-
-        // Imprimir buffer no display
+		if ((PIND & (1 << BOTAO_APAGAR)))
+        {
+            shift_r_buffer();
+            desenharLCD = true;
+            _delay_ms(200);
+            // delay(200);
+        }
 
         if (tempo_nao_pressionado > TEMPO_ENTRE_LETRAS)
         {
@@ -218,11 +278,20 @@ int main()
                 continue;
             }
             char letra_a_adicionar = dicionario_morse[contador];
-            // Shiftar o buffer
-            // Colocar letra no buffer
-            n = 0;
+          
+          	LCD_BUFFER[15] = letra_a_adicionar;
+            shift_l_buffer();
+          	n = 0;
             contador = 31;
+            desenharLCD = true;
+        }
 
+        print_mensagem();
+        if (desenharLCD)
+        {
+            // Imprimir buffer no display
+            // print_mensagem();
+            desenharLCD = false;
         }
 
         if (tempo_pressionado == 0)
@@ -259,4 +328,3 @@ int main()
         }
     }
 }
-
