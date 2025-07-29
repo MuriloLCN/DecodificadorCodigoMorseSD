@@ -3,13 +3,8 @@
 #include <avr/io.h>        
 #include <util/delay.h>    
 #include <math.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <LiquidCrystal_I2C.h>
 #include <stdio.h>
-
-// #include <avr/pgmspace.h>  
-#define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
 #define pulso_enable() _delay_us(1); set_bit(CONTR_LCD,E); _delay_us(1); clr_bit(CONTR_LCD,E); _delay_us(45)
 
@@ -34,7 +29,7 @@
 #define LED_AMARELO PB2
 #define LED_VERDE PB3
 
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 float tempo_pressionado = 0.0;
 float tempo_nao_pressionado = 0.0;
@@ -123,17 +118,11 @@ char dicionario_morse[] = {
 
 void print_mensagem()
 {
-  // Imprime a mensagem no display LCD (Obs: O display que temos é i2c, tem que usar a biblioteca eu acho)
-    display.clearDisplay();
-
-    display.setTextSize(2);
-    display.setTextColor(WHITE);
-    display.setCursor(50, 10);
-    // Display static text
-    display.println(LCD_BUFFER);
-    // display.setCursor(0, 30);
-    // display.println(mensagem2);
-    display.display(); 
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    for (int i = 0; i < 16; i++) {
+        lcd.print(LCD_BUFFER[i]);
+    }
 }
 
 void timer_tick()
@@ -236,9 +225,9 @@ int main()
     sei();
 
     
-    Wire.begin();
-    display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-    _delay_ms(100);
+    lcd.init();
+    lcd.backlight();
+    // _delay_ms(100);
 
     //delay(2000);
     // DDRD = 0xFF;
@@ -258,8 +247,7 @@ int main()
         {
             shift_l_buffer();
             // LCD_BUFFER[15] = ' ';
-            // desenharLCD = true;
-            print_mensagem();
+            desenharLCD = true;
             _delay_ms(200);
             // delay(200);
         }
@@ -267,8 +255,7 @@ int main()
 		if ((PIND & (1 << BOTAO_APAGAR)))
         {
             shift_r_buffer();
-            // desenharLCD = true;
-            print_mensagem();
+            desenharLCD = true;
             _delay_ms(200);
             // delay(200);
         }
